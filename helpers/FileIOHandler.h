@@ -2,8 +2,7 @@
 // Created by laadim on 18.01.26.
 //
 
-#ifndef ZOS_REFACTOR_FILEIOHANDLER_H
-#define ZOS_REFACTOR_FILEIOHANDLER_H
+#pragma once
 #include <cstdint>
 #include <fstream>
 #include <memory>
@@ -11,103 +10,125 @@
 #include <vector>
 
 /**
- * @brief Stream based IO handler
+ * @brief Stream-based file I/O handler.
  *
- * Class handling IO operations over a file.
- * Can create and resize files.
- *
- * @author laadim
+ * Provides low-level binary read/write access to a file using a single
+ * managed stream. Supports file creation, resizing, and random-access
+ * reads and writes.
  */
 class FileIOHandler {
-    public:
+public:
+    /**
+     * @brief File opening modes.
+     */
     enum class FileModes {
-        READ, READ_WRITE
+        /// Open file in read-only mode
+        READ,
+
+        /// Open file in read-write mode (creates file if missing)
+        READ_WRITE
     };
 
     /**
-     * @brief IO handler constructor
+     * @brief Construct a FileIOHandler.
+     *
+     * Does not open a file by itself.
      */
     FileIOHandler() = default;
 
     /**
-     * @brief IO handler destructor
+     * @brief Destructor.
      *
-     * Flushes and closes stream.
+     * Flushes buffers and closes the file stream if open.
      */
     ~FileIOHandler();
 
     /**
-     * @brief Open a file
+     * @brief Open a file stream.
      *
-     * Open a stream over the file.
-     * If in write mode, creates the file if it does not exist
+     * Opens a binary stream over the specified file.
+     * In READ_WRITE mode, the file is created if it does not exist.
      *
-     * @param fileName path to file
-     * @param mode mode to open stream in
+     * @param fileName Path to the file.
+     * @param mode Mode to open the file in.
      *
-     * @throw FileDoesNotExistException File was not found
-     * @throw CouldNotOpenFile Error occurred while opening the file
-     *
-     * @return True if file was opened
+     * @throws FileDoesNotExistException If the file does not exist in READ mode.
+     * @throws CouldNotOpenFileException If the file could not be opened.
      */
-    void OpenFile(const std::string &fileName, FileModes mode);
+    void OpenFile(const std::string& fileName, FileModes mode);
 
     /**
-     * @brief Flush and close
+     * @brief Flush and close the file stream.
+     *
+     * Safe to call multiple times.
      */
     void CloseFile() const;
 
-
+    /**
+     * @brief Ensure the file was opened in a writable mode.
+     *
+     * @throws FileReadOnlyException If the file is read-only.
+     */
     void EnsureWritable() const;
 
     /**
-     * @brief Read a vector of bytes
+     * @brief Read a sequence of bytes from the file.
      *
-     * @param offset Start of bytes to read
-     * @param size Number of bytes
-     * @return Vector of bytes read
+     * @param offset Byte offset from the beginning of the file.
+     * @param size Number of bytes to read.
+     *
+     * @return Vector containing the bytes read.
+     *
+     * @throws FileNotOpenException If no file is open.
      */
-    std::vector<char> ReadBytes(uint64_t offset, uint64_t size) const;
+    [[nodiscard]] std::vector<char> ReadBytes(uint64_t offset, uint64_t size) const;
 
     /**
-     * @brief Write data to file
+     * @brief Write bytes to the file.
      *
-     * @param offset Start of bytes to write
-     * @param data Data to write
-     * @return Number of bytes written
+     * @param offset Byte offset from the beginning of the file.
+     * @param data Data to write.
+     *
+     * @throws FileNotOpenException If no file is open.
+     * @throws FileReadOnlyException If file is read-only.
+     * @throws FileWriteException If the write fails.
      */
-    uint64_t WriteBytes(uint64_t offset, const std::vector<char> &data) const;
+    void WriteBytes(uint64_t offset, const std::vector<char>& data) const;
 
     /**
-     * @brief Flush stream
+     * @brief Flush buffered output to disk.
      */
     void Flush() const;
 
     /**
-     * @brief Resizes open file
+     * @brief Resize the currently open file.
      *
-     * @param newSize Size to resize to
-     * @return New size
+     * The file is resized and fully zero-filled to the new size.
+     *
+     * @param newSize Target file size in bytes.
+     *
+     * @return The new file size.
+     *
+     * @throws FileNotOpenException If no file is open.
+     * @throws FileReadOnlyException If file is read-only.
+     * @throws FileWriteException If resizing or zero-filling fails.
      */
-    uint64_t Resize(uint64_t newSize) const;
+    [[nodiscard]] uint64_t Resize(uint64_t newSize) const;
 
     /**
-     * @brief Checks if stream is open
+     * @brief Check whether a file stream is currently open.
      *
-     * @return File is open
+     * @return True if a file is open, false otherwise.
      */
-    bool IsOpen() const;
+    [[nodiscard]] bool IsOpen() const;
 
-    private:
-    /// Name of opened file
+private:
+    /// Path of the currently opened file
     std::string fileName;
 
-    /// File stream
+    /// Owned file stream
     std::unique_ptr<std::fstream> stream;
 
-    /// Stream mode
+    /// Mode the file was opened with
     FileModes mode;
 };
-
-
-#endif //ZOS_REFACTOR_FILEIOHANDLER_H
