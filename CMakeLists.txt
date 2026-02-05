@@ -3,7 +3,7 @@ project(ZOS)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ZOS_refactor
+add_executable(ZOS
         main.cpp
         helpers/FileIOHandler.cpp
         helpers/FileIOHandler.h
