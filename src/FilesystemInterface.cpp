@@ -34,7 +34,11 @@ FilesystemInterface::Execute(const std::string &command) {
     }
     catch (std::exception& e) {
         auto cwd = this->cmd_pwd({});
-        return { cwd, std::string("Error: ") + e.what() };
+        msg = e.what();
+        if (msg == "bad_function_call") {
+            msg = "Unknown command";
+        }
+        return { cwd, std::string("Error: ") + msg };
     }
 }
 

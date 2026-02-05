@@ -5,6 +5,7 @@
 #include "../include/Filesystem.h"
 
 #include <algorithm>
+#include <iostream>
 #include <sstream>
 
 #include "../helpers/FileIOExceptions.h"
@@ -286,7 +287,7 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
     for (auto b : childBytes) {
         toWrite.push_back(b);
     }
-    constexpr uint32_t ENTRYSIZE = 12 + sizeof(uint32_t); // ✅ correct (16 bytes)
+    constexpr uint32_t ENTRYSIZE = 12 + sizeof(uint32_t);
 
     // attempt using direct blocks
     for (auto block : node.getDirectLinks()) {
@@ -296,8 +297,6 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                 throw CouldNotAllocateBlockException("Could not allocate block");
             }
 
-            // ⚠️ OK only if UNUSED entry marker == UINT32_MAX
-            // otherwise directory scanning logic must match this
             this->FileIO->WriteBytes(
                     this->superblock.dataBlocksOffset +
                     *tmp * this->superblock.blockSize,
@@ -354,7 +353,7 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                 const uint32_t offset =
                     this->superblock.dataBlocksOffset +
                     block * this->superblock.blockSize +
-                    children.size() * ENTRYSIZE;  // ✅ correct
+                    children.size() * ENTRYSIZE;
 
                 this->FileIO->WriteBytes(offset, toWrite);
 
@@ -375,7 +374,6 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                     std::vector<char>(this->superblock.blockSize, 0xFF)
                 );
 
-            // ✅ correct use of indirects.size() (block-id table index)
             this->FileIO->WriteBytes(
                     this->superblock.dataBlocksOffset +
                     node.getFirstLevelIndirectLink() * this->superblock.blockSize +
@@ -385,9 +383,8 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
 
             const uint32_t offset =
                 this->superblock.dataBlocksOffset +
-                *newBlock * this->superblock.blockSize; // ✅ first slot
+                *newBlock * this->superblock.blockSize;
 
-            // ❌ WRONG WriteBytes check
             this->FileIO->WriteBytes(offset, toWrite);
 
             writeINode(node);
@@ -425,9 +422,8 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                     const uint32_t offset =
                         this->superblock.dataBlocksOffset +
                         block2 * this->superblock.blockSize +
-                        children.size() * ENTRYSIZE;  // ✅ correct domain
+                        children.size() * ENTRYSIZE;
 
-                    // ❌ WRONG WriteBytes check
                     this->FileIO->WriteBytes(offset, toWrite);
 
                     writeINode(node);
@@ -447,7 +443,6 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                         std::vector<char>(this->superblock.blockSize, 0xFF)
                     );
 
-                // ✅ correct block-id table indexing
                 this->FileIO->WriteBytes(
                         this->superblock.dataBlocksOffset +
                         block * this->superblock.blockSize +
@@ -457,7 +452,7 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
 
                 const uint32_t offset =
                     this->superblock.dataBlocksOffset +
-                    *newBlock * this->superblock.blockSize; // ✅ first slot
+                    *newBlock * this->superblock.blockSize;
 
                 this->FileIO->WriteBytes(offset, toWrite);
 
@@ -478,7 +473,6 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                     std::vector<char>(this->superblock.blockSize, 0xFF)
                 );
 
-            // ✅ correct block-id table indexing
             this->FileIO->WriteBytes(
                     this->superblock.dataBlocksOffset +
                     node.getSecondLevelIndirectLink() * this->superblock.blockSize +
@@ -497,7 +491,6 @@ void Filesystem::AddChild(INode &node, std::string name, uint32_t childNode) {
                     std::vector<char>(this->superblock.blockSize, 0xFF)
                 );
 
-            // ✅ correct
             this->FileIO->WriteBytes(
                     this->superblock.dataBlocksOffset +
                     *newBlock * this->superblock.blockSize,
@@ -656,7 +649,6 @@ std::vector<ChildNodeNameIdPair> Filesystem::ReadBlockAsSubdirectories(const uin
         );
         offset += 12;
 
-        // ✅ trim at first '\0'
         auto nul = name.find('\0');
         if (nul != std::string::npos) {
             name.resize(nul);
@@ -975,11 +967,13 @@ std::vector<uint32_t> Filesystem::GetAllBlockIds(const INode &node) const {
             ids.push_back(b);
         }
     }
-
-    ids.push_back(node.getFirstLevelIndirectLink());
-    for (auto b : this->ReadBlockAsBlockIds(node.getFirstLevelIndirectLink())) {
-        if (b != INode::UNUSED_LINK) {
-            ids.push_back(b);
+    auto first = node.getFirstLevelIndirectLink();
+    if (first != INode::UNUSED_LINK) {
+        ids.push_back(first);
+        for (auto b : this->ReadBlockAsBlockIds(first)) {
+            if (b != INode::UNUSED_LINK) {
+                ids.push_back(b);
+            }
         }
     }
 
@@ -1126,6 +1120,10 @@ void Filesystem::RemoveDirectory(const std::string& path) {
     auto id = this->FindChildId(parent, name);
     if (!id) {
         throw PathNotFoundException("Directory not found");
+    }
+
+    if (*id == this->currentNode.getId()) {
+        throw PathNotFoundException("Cannot remove current directory");
     }
 
     INode dir = this->readINode(*id);
