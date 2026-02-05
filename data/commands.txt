@@ -1,3 +1,0 @@
-format 30KB
-mkdir test
-exit
