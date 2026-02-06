@@ -258,7 +258,7 @@ private:
      * @brief Remove a directory entry.
      */
     void RemoveChild(const INode& node,
-                     uint32_t childNode) const;
+                     uint32_t childNode, std::string filename) const;
 
     /**
      * @brief Attach a data block to an inode.

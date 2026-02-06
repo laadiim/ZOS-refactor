@@ -746,7 +746,7 @@ std::vector<ChildNodeNameIdPair> Filesystem::GetChildren(const INode &node) cons
     return children;
 }
 
-void Filesystem::RemoveChild(const INode& node, const uint32_t childNode) const {
+void Filesystem::RemoveChild(const INode& node, const uint32_t childNode, std::string filename = "") const {
     if (!node.isDir()) {
         throw NotADirectoryException("Target not a directory");
     }
@@ -764,7 +764,7 @@ void Filesystem::RemoveChild(const INode& node, const uint32_t childNode) const 
     auto scanBlock = [&](uint32_t blockId) {
         auto entries = ReadBlockAsSubdirectories(blockId);
         for (uint32_t i = 0; i < entries.size(); ++i) {
-            if (entries[i].id == childNode) {
+            if (entries[i].id == childNode && (filename.empty() || filename == entries[i].name)) {
                 target = { blockId, i };
             }
             last = { blockId, i };
@@ -1402,7 +1402,7 @@ void Filesystem::RemoveFile(const std::string& path) {
     // =========================
     // Remove directory entry
     // =========================
-    RemoveChild(parent, file.getId());
+    RemoveChild(parent, file.getId(), filename);
     writeINode(parent);
 
     // =========================
@@ -1413,6 +1413,7 @@ void Filesystem::RemoveFile(const std::string& path) {
     }
     else {
         file.removeLink();
+        writeINode(file);
     }
 }
 
